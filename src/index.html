@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>History Extension</title>
+        <link rel="stylesheet" href="/src/style.css" />
+    </head>
+    <body class="page-background">
+        <div class="main-container">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-content">
+                    <h1 class="app-title">History</h1>
+                    <button id="settingsButton" class="icon-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                            <path d="M20 7h-9"></path>
+                            <path d="M14 17H5"></path>
+                            <circle cx="17" cy="17" r="3"></circle>
+                            <circle cx="7" cy="7" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Results Area -->
+            <div id="results" class="results-area">
+                <div class="links-list" id="linksList">
+                    <!-- Links will be inserted here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Fixed Search Form at Bottom -->
+            <div class="search-container">
+                <form id="searchForm" class="search-form">
+                    <input type="text" id="searchInput" placeholder="Search history..." class="search-input" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.3-4.3"></path>
+                    </svg>
+                </form>
+            </div>
+
+            <!-- Settings Modal -->
+            <div id="settingsModal" class="settings-modal hidden">
+                <div class="modal-header">
+                    <h2 class="settings-title">Settings</h2>
+                    <button id="closeSettings" class="close-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="settings-content">
+                    <div class="setting-item">
+                        <label class="setting-label"> Maximum Results (<span id="maxResultsValue" class="setting-value">50</span>) </label>
+                        <input type="range" id="maxResults" min="10" max="100" value="50" class="setting-slider" />
+                    </div>
+
+                    <div class="setting-item">
+                        <label class="setting-label"> Search Delay (<span id="searchDelayValue" class="setting-value">500</span>ms) </label>
+                        <input type="range" id="searchDelay" min="0" max="1000" step="100" value="500" class="setting-slider" />
+                    </div>
+
+                    <div class="setting-item">
+                        <label class="setting-label"> Cache Time (<span id="cacheTimeValue" class="setting-value">60</span> minutes) </label>
+                        <input type="range" id="cacheTime" min="5" max="120" step="5" value="60" class="setting-slider" />
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script type="module" src="/src/main.js"></script>
+    </body>
+</html>

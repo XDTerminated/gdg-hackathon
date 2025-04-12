@@ -1,0 +1,307 @@
+/* Base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Page background */
+.page-background {
+    background: linear-gradient(to bottom right, #111827, #000000);
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #e5e7eb;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Main container */
+.main-container {
+    width: 400px;
+    height: 600px;
+    background-color: rgba(17, 24, 39, 0.8);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
+    border: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+/* Header */
+.header {
+    padding: 16px;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.app-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    background: linear-gradient(to right, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* Icon button */
+.icon-button {
+    padding: 8px;
+    border-radius: 12px;
+    transition: all 0.3s;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.icon-button:hover {
+    background-color: rgba(31, 41, 55, 0.5);
+}
+
+.icon {
+    color: #9ca3af;
+    transition: color 0.3s;
+}
+
+.icon-button:hover .icon {
+    color: #60a5fa;
+}
+
+/* Results area */
+.results-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.links-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Link item */
+.link-item {
+    display: block;
+    padding: 16px;
+    background-color: rgba(31, 41, 55, 0.3);
+    border-radius: 12px;
+    transition: all 0.3s;
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    text-decoration: none;
+}
+
+.link-item:hover {
+    background-color: rgba(31, 41, 55, 0.5);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.link-title {
+    color: #60a5fa;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.3s;
+}
+
+.link-item:hover .link-title {
+    color: #93c5fd;
+}
+
+.link-url {
+    font-size: 0.875rem;
+    color: #6b7280;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.3s;
+}
+
+.link-item:hover .link-url {
+    color: #9ca3af;
+}
+
+/* Search form */
+.search-container {
+    padding: 16px;
+    border-top: 1px solid rgba(75, 85, 99, 0.5);
+    background-color: rgba(17, 24, 39, 0.5);
+    backdrop-filter: blur(10px);
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+}
+
+.search-form {
+    position: relative;
+}
+
+.search-input {
+    width: 100%;
+    padding: 12px 16px;
+    padding-right: 40px;
+    background-color: rgba(31, 41, 55, 0.5);
+    border: 1px solid rgba(75, 85, 99, 0.5);
+    border-radius: 12px;
+    color: #d1d5db;
+    transition: all 0.3s;
+}
+
+.search-input:focus {
+    outline: none;
+    ring: 2px solid rgba(59, 130, 246, 0.5);
+    border-color: transparent;
+}
+
+.search-input::placeholder {
+    color: #6b7280;
+}
+
+.search-icon {
+    position: absolute;
+    right: 12px;
+    top: 14px;
+    width: 20px;
+    height: 20px;
+    color: #6b7280;
+}
+
+/* Settings modal */
+.settings-modal {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 16px;
+    border-radius: 16px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.settings-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    background: linear-gradient(to right, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.close-button {
+    padding: 8px;
+    border-radius: 12px;
+    transition: all 0.3s;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.close-button:hover {
+    background-color: rgba(31, 41, 55, 0.5);
+}
+
+.settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.setting-item {
+    margin-bottom: 8px;
+}
+
+.setting-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #d1d5db;
+    margin-bottom: 8px;
+}
+
+.setting-value {
+    color: #60a5fa;
+}
+
+.setting-slider {
+    width: 100%;
+    height: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+.hidden {
+    display: none;
+}
+
+.loading-message,
+.no-results-message,
+.error-message,
+.info-message {
+    padding: 20px;
+    text-align: center;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.error-message {
+    color: #f87171;
+}
+
+.link-preview-tooltip {
+    position: fixed;
+    background-color: rgba(10, 10, 20, 0.95); /* Darker, slightly transparent */
+    color: #e5e7eb;
+    padding: 8px 12px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(75, 85, 99, 0.6);
+    font-size: 0.8rem;
+    max-width: 350px; /* Limit width */
+    z-index: 1000; /* Ensure it's on top */
+    opacity: 0; /* Start hidden */
+    transition: opacity 0.15s ease-in-out;
+    pointer-events: none; /* Prevent tooltip from blocking mouse events on elements below */
+    white-space: normal; /* Allow wrapping */
+}
+
+.link-preview-tooltip .tooltip-title {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #93c5fd; /* Light blue for title */
+    word-break: break-all; /* Break long titles */
+}
+
+.link-preview-tooltip .tooltip-url {
+    display: block;
+    color: #9ca3af; /* Gray for URL */
+    word-break: break-all; /* Break long URLs */
+}

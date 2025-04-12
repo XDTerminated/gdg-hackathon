@@ -1,6 +1,14 @@
 {
-    "name": "GDG Hackathon",
-    "description": "Test",
+    "name": "GDG Hackathon History Search",
+    "description": "Search browser history using natural language with Gemini.",
     "version": "1.0",
-    "manifest_version": 3
+    "permissions": ["history", "storage"],
+    "manifest_version": 3,
+    "background": {
+        "service_worker": "src/background.js"
+    },
+    "action": {
+        "default_popup": "src/index.html"
+    },
+    "host_permissions": ["https://generativelanguage.googleapis.com/"]
 }
