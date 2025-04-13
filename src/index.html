@@ -51,6 +51,23 @@
 
                 <div class="settings-content">
                     <div class="setting-item">
+                        <label class="setting-label"> Max History Items (<span id="maxHistoryItemsValue" class="setting-value">1000</span>) </label>
+                        <input type="range" id="maxHistoryItemsSlider" min="10" max="5000" step="10" value="1000" class="setting-slider" />
+                    </div>
+
+                    <!-- Add Time Range Setting -->
+                    <div class="setting-item">
+                        <label for="timeRangeSelect" class="setting-label">Search Time Range</label>
+                        <select id="timeRangeSelect" class="setting-select">
+                            <option value="all_time" selected>All Time</option>
+                            <option value="last_day">Last 24 Hours</option>
+                            <option value="last_week">Last 7 Days</option>
+                            <option value="last_month">Last 30 Days</option>
+                        </select>
+                    </div>
+                    <!-- End Add Time Range Setting -->
+
+                    <div class="setting-item">
                         <label class="setting-label"> Maximum Results (<span id="maxResultsValue" class="setting-value">50</span>) </label>
                         <input type="range" id="maxResults" min="10" max="100" value="50" class="setting-slider" />
                     </div>
