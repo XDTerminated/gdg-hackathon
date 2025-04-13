@@ -1,5 +1,5 @@
 {
-    "name": "GDG Hackathon History Search",
+    "name": "Site Sleuth",
     "description": "Search browser history using natural language with Gemini.",
     "version": "1.0",
     "permissions": ["history", "storage", "scripting", "tabs"],
