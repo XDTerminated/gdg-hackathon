@@ -5,7 +5,7 @@ const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/
 // Assuming 'terminxted-gdg' is the correct Hugging Face Space name
 const FETCH_TEXT_API_URL = "https://terminxted-gdg.hf.space/fetch_text";
 const FETCH_CONTENT_TIMEOUT_MS = 15000; // Timeout for fetching content from API (15 seconds)
-const MAX_ITEMS_TO_FETCH_CONTENT = 50; // Limit how many pages we fetch content for
+const MAX_ITEMS_TO_FETCH_CONTENT = 5000; // Limit how many pages we fetch content for
 const MAX_HISTORY_RESULTS = 5000; // Max history items to request initially
 
 // --- Helper Functions ---
