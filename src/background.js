@@ -1,55 +1,21 @@
 // --- Constants ---
-const GEMINI_API_KEY = "AIzaSyDG1EvYmYgTjtEnS1hhpTqNTSCHgzGdoBw"; // IMPORTANT: Consider securing this key
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-const CONTENT_FETCH_API_BASE = "https://hackez-gdg.hf.space/"; // API to fetch webpage text
-
-// --- Default Settings ---
-const DEFAULT_MAX_HISTORY_ITEMS = 1000;
-const DEFAULT_TIME_RANGE = "all_time";
-const MAX_FILTERED_LINKS = 75; // Target number of links after initial URL/Title filtering
-const MAX_CONTENT_LENGTH_PER_URL = 2000; // Limit text length sent to Gemini per URL to manage prompt size
-
-// --- Chrome Runtime Listener ---
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "searchHistory") {
-        // Use settings from the request, providing defaults if missing
-        const maxHistoryItems = request.maxHistoryItems || DEFAULT_MAX_HISTORY_ITEMS;
-        const timeRange = request.timeRange || DEFAULT_TIME_RANGE;
-        const query = request.query;
-
-        if (!query) {
-            console.error("Background: Received search request without a query.");
-            sendResponse({ success: false, error: "No search query provided." });
-            return false; // No async response needed
-        }
-
-        console.log(`Background: Received search query: "${query}", Max History Items: ${maxHistoryItems}, Time Range: ${timeRange}`);
-
-        searchHistoryAndProcess(query, maxHistoryItems, timeRange)
-            .then((results) => {
-                console.log("Background: Sending results to popup:", results);
-                sendResponse({ success: true, results: results });
-            })
-            .catch((error) => {
-                console.error("Background: Error processing search:", error);
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                sendResponse({ success: false, error: errorMessage || "Unknown error during search" });
-            });
-
-        return true; // Indicates that the response is sent asynchronously
-    }
-    // Handle other potential actions if needed
-    return false; // No async response for other actions
-});
+// IMPORTANT: Use your actual Gemini API Key. Consider securing this.
+const GEMINI_API_KEY = "AIzaSyDG1EvYmYgTjtEnS1hhpTqNTSCHgzGdoBw"; // Use the key from the file
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+// Assuming 'terminxted-gdg' is the correct Hugging Face Space name
+const FETCH_TEXT_API_URL = "https://terminxted-gdg.hf.space/fetch_text";
+const FETCH_CONTENT_TIMEOUT_MS = 15000; // Timeout for fetching content from API (15 seconds)
+const MAX_ITEMS_TO_FETCH_CONTENT = 50; // Limit how many pages we fetch content for
+const MAX_HISTORY_RESULTS = 5000; // Max history items to request initially
 
 // --- Helper Functions ---
 
 /**
- * Calculates the start time in milliseconds since the epoch based on a time range string.
- * @param {string} timeRange - The time range identifier (e.g., "last_day", "last_week", "all_time").
- * @returns {number} The timestamp in milliseconds for the start of the search period.
+ * Calculates the start time based on the selected time range.
+ * @param {string} timeRange - 'all_time', 'last_day', 'last_week', 'last_month'.
+ * @returns {number} Start time in milliseconds since the epoch, or 0 for all_time.
  */
-function calculateStartTime(timeRange) {
+function getStartTime(timeRange) {
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
     switch (timeRange) {
@@ -61,26 +27,101 @@ function calculateStartTime(timeRange) {
             return now - 30 * oneDay; // Approximation
         case "all_time":
         default:
-            return 0; // Search all history
+            if (!["all_time", "last_day", "last_week", "last_month"].includes(timeRange)) {
+                console.warn(`Invalid timeRange "${timeRange}" received, defaulting to all_time.`);
+            }
+            return 0;
     }
 }
 
 /**
- * Calls the Gemini API with the provided prompt text.
- * @param {string} promptText - The complete prompt to send to the Gemini API.
- * @returns {Promise<string|null>} The text content of the Gemini response, or null if no text is found.
- * @throws {Error} If the API call fails or returns an error status.
+ * Fetches text content from a given URL using the FastAPI endpoint.
+ * (Renamed from fetchDescription for clarity in this context, but using original code)
+ * @param {string} url - The URL to fetch content from.
+ * @returns {Promise<string|null>} The text content or null if fetching fails.
  */
-async function callGemini(promptText) {
-    console.log("Background: Calling Gemini API...");
+async function fetchContentFromApi(url) {
+    // Renamed for clarity, uses original logic
+    // Basic check for valid URL format
+    if (!url || (!url.startsWith("http:") && !url.startsWith("https:"))) {
+        // console.log(`Skipping fetch for invalid or non-HTTP(S) URL: ${url}`); // Less verbose logging
+        return null;
+    }
+    const apiUrl = `${FETCH_TEXT_API_URL}?url=${encodeURIComponent(url)}`;
+    try {
+        // console.log(`Attempting to fetch: ${apiUrl}`); // Log the exact URL if needed for debugging
+        const response = await fetch(apiUrl, {
+            method: "GET",
+            signal: AbortSignal.timeout(FETCH_CONTENT_TIMEOUT_MS), // Add timeout
+        });
+        if (!response.ok) {
+            // Log less verbosely for common errors like 404 or timeouts on the target site
+            // console.warn(`Fetch API HTTP error for ${url}: Status ${response.status}`);
+            return null; // Treat non-ok responses as fetch failure
+        }
+        const description = await response.text();
+        // Check if the API returned its own error message or empty content
+        if (!description || description.startsWith("Error fetching URL:")) {
+            // console.warn(`API returned an error or no content for ${url}`);
+            return null;
+        }
+        // Limit content length AFTER fetching
+        return description.substring(0, 8000);
+    } catch (error) {
+        if (error.name === "TimeoutError") {
+            console.warn(`Timeout fetching content for ${url}`);
+        } else {
+            // Log other network errors, but maybe less verbosely unless debugging
+            // console.error(`Network/fetch error for ${url}:`, error.message);
+        }
+        return null; // Indicate failure
+    }
+}
+
+/**
+ * Calls the Gemini API to find the most relevant history item based on fetched content.
+ * (Adapts the original callGemini function)
+ * @param {string} userQuery - The user's natural language query.
+ * @param {Array<object>} historyItemsWithContent - Array of { url, title, content } objects.
+ * @returns {Promise<object|null>} The most relevant history item {url, title} or null.
+ */
+async function findRelevantHistoryWithGemini(userQuery, historyItemsWithContent) {
+    const validItems = historyItemsWithContent.filter((item) => item.content);
+    if (validItems.length === 0) {
+        console.log("No history items with fetched content to send to Gemini.");
+        return null;
+    }
+
+    // Construct the prompt for Gemini
+    let promptText = `User Query: "${userQuery}"\n\n`;
+    promptText += "Analyze the following browser history items (URL, Title, Content Snippet) and identify the single most relevant item that best answers or relates to the user query. Only return the URL of the most relevant item. If no item is sufficiently relevant, return 'NONE'.\n\n";
+
+    validItems.forEach((item, index) => {
+        promptText += `Item ${index + 1}:\n`;
+        promptText += `URL: ${item.url}\n`;
+        promptText += `Title: ${item.title}\n`;
+        promptText += `Content Snippet: ${item.content.substring(0, 500)}...\n\n`; // Limit snippet in prompt
+    });
+    promptText += "Most relevant URL:";
+
+    console.log(`Sending ${validItems.length} items to Gemini. Prompt length: ${promptText.length}`);
+
     const geminiRequest = {
         contents: [{ parts: [{ text: promptText }] }],
-        // Consider adding safetySettings and generationConfig if needed for finer control
-        // safetySettings: [ ... ],
-        // generationConfig: { temperature: 0.7, maxOutputTokens: 1024, ... }
+        generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 256, // Generous buffer for a URL
+        },
+        safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+        ],
     };
 
     try {
+        // Using the fetch logic from the original callGemini
         const response = await fetch(GEMINI_API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -90,205 +131,158 @@ async function callGemini(promptText) {
         if (!response.ok) {
             const errorBody = await response.text();
             console.error(`Gemini API error! status: ${response.status}, body: ${errorBody}`);
-            // Provide a more specific error based on status if possible
             throw new Error(`Gemini API request failed with status ${response.status}`);
         }
 
         const data = await response.json();
-        console.log("Background: Received response from Gemini.");
+        // console.log("Gemini API Response:", JSON.stringify(data)); // Verbose logging
 
-        // Safely access the response text using optional chaining
-        const resultText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!resultText) {
-            console.warn("Background: Gemini response did not contain the expected text structure.");
-            return null; // Indicate no valid text found
-        }
-        return resultText;
-    } catch (error) {
-        console.error("Background: Network or fetch error calling Gemini API:", error);
-        throw new Error(`Failed to communicate with Gemini API: ${error.message}`); // Re-throw for upstream handling
-    }
-}
+        // Using the parsing logic from the original callGemini, adapted slightly
+        const resultText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-/**
- * Fetches text content for a given URL using the content fetch API.
- * @param {string} url - The URL to fetch content from.
- * @returns {Promise<{text: string|null, error: string|null}>} An object containing the fetched text or an error message.
- */
-async function fetchContentForUrl(url) {
-    try {
-        const fetchUrl = `${CONTENT_FETCH_API_BASE}?url=${encodeURIComponent(url)}`;
-        const response = await fetch(fetchUrl, {
-            method: "POST", // Assuming POST is required by the API
-            headers: { Accept: "application/json" }, // Assuming JSON response
-            // Add a timeout? Consider signal: AbortSignal.timeout(10000) // 10 seconds
-        });
-
-        if (!response.ok) {
-            // Log specific HTTP error status
-            console.warn(`Background: Content fetch API returned status ${response.status} for ${url}`);
-            throw new Error(`HTTP error ${response.status}`);
-        }
-
-        const data = await response.json(); // Assuming response is JSON: { "text": "..." }
-        const text = data.text || ""; // Handle cases where 'text' property might be missing
-        console.log(`Background: Fetched content for ${url} (Length: ${text.length})`);
-        return { text: text.substring(0, MAX_CONTENT_LENGTH_PER_URL), error: null }; // Truncate content
-    } catch (error) {
-        console.error(`Background: Failed to fetch content for ${url}:`, error);
-        return { text: null, error: error.message };
-    }
-}
-
-// --- Main Search Logic ---
-
-/**
- * Searches browser history, filters results using Gemini (URL/Title), fetches content for filtered items,
- * analyzes content with Gemini, and returns the final relevant history items.
- * @param {string} query - The user's search query.
- * @param {number} maxHistoryItems - The maximum number of history items to initially retrieve.
- * @param {string} timeRange - The time range identifier for the history search.
- * @returns {Promise<Array<{url: string, title: string}>>} A list of relevant history items.
- */
-async function searchHistoryAndProcess(query, maxHistoryItems, timeRange) {
-    // 1. Get History Items based on Time Range and Limit
-    const startTime = calculateStartTime(timeRange);
-    console.log(`Background: Searching history from timestamp ${startTime} with max results ${maxHistoryItems}.`);
-
-    const allHistoryItems = await chrome.history.search({
-        text: "", // Search all items within the time range
-        maxResults: maxHistoryItems,
-        startTime: startTime,
-    });
-
-    console.log(`Background: Fetched ${allHistoryItems.length} initial history items.`);
-    if (!allHistoryItems || allHistoryItems.length === 0) {
-        return []; // No history found for the period
-    }
-
-    // Filter out invalid/unusable URLs early
-    const validHistoryItems = allHistoryItems.filter((item) => item.url && (item.url.startsWith("http:") || item.url.startsWith("https:")));
-    if (validHistoryItems.length === 0) {
-        console.log("Background: No valid http(s) URLs found in the fetched history.");
-        return [];
-    }
-    console.log(`Background: Found ${validHistoryItems.length} valid history items.`);
-
-    // 2. Initial Filtering via Gemini (URL/Title)
-    console.log("Background: Starting initial URL/Title filtering with Gemini...");
-    const filterPrompt = `Based on the user query "${query}", identify up to ${MAX_FILTERED_LINKS} potentially relevant URLs from the following list. Consider only the URL and the page Title. List *only* the relevant URLs, one per line, without any extra text or numbering. If none seem relevant, respond with "NONE".
-
-User Query: ${query}
-
-History Items (URL and Title only):
-${validHistoryItems.map((item) => `URL: ${item.url}\nTitle: ${item.title || "No Title Available"}\n---`).join("\n\n")}`;
-
-    const filteredUrlsText = await callGemini(filterPrompt);
-
-    if (!filteredUrlsText || filteredUrlsText.trim().toUpperCase() === "NONE") {
-        console.log("Background: Gemini filtering (URL/Title) found no potentially relevant URLs.");
-        return [];
-    }
-
-    // Parse the list of URLs returned by Gemini
-    const filteredUrls = filteredUrlsText
-        .split("\n")
-        .map((url) => url.trim())
-        .filter((url) => url.startsWith("http")); // Ensure they are valid URLs
-
-    if (filteredUrls.length === 0) {
-        console.log("Background: No valid URLs extracted from Gemini's filtering response.");
-        return [];
-    }
-    console.log(`Background: Gemini filtering identified ${filteredUrls.length} potential URLs.`);
-
-    // Map filtered URLs back to the original history items to retain all info
-    // Use a Set for efficient lookup of filtered URLs
-    const filteredUrlSet = new Set(filteredUrls);
-    const filteredHistoryItems = validHistoryItems.filter((item) => filteredUrlSet.has(item.url));
-
-    if (filteredHistoryItems.length === 0) {
-        console.log("Background: Could not map filtered URLs back to history items (this shouldn't normally happen).");
-        return [];
-    }
-    console.log(`Background: Mapped ${filteredHistoryItems.length} items for content fetching.`);
-
-    // 3. Fetch Content for Filtered Items
-    console.log(`Background: Fetching content for ${filteredHistoryItems.length} filtered items...`);
-    const contentFetchPromises = filteredHistoryItems.map(async (item) => {
-        const contentResult = await fetchContentForUrl(item.url);
-        return {
-            url: item.url,
-            title: item.title || "No Title Available",
-            text: contentResult.text, // Will be null if fetch failed
-            fetchError: contentResult.error,
-        };
-    });
-
-    const fetchedContents = await Promise.all(contentFetchPromises);
-
-    // Filter out items where fetching failed or resulted in no text
-    const validContents = fetchedContents.filter((item) => item.text && item.text.trim().length > 0);
-
-    if (validContents.length === 0) {
-        console.log("Background: No valid content could be fetched from the filtered history items.");
-        return []; // No content to analyze
-    }
-    console.log(`Background: Successfully fetched and validated content for ${validContents.length} items.`);
-
-    // 4. Final Analysis via Gemini (Content)
-    console.log("Background: Starting final content analysis with Gemini...");
-    const analysisPrompt = `Analyze the following browser history items (pre-filtered for relevance) based on the user query: "${query}". Each item includes a URL, Title, and fetched text content. Identify the URLs that are most relevant *based specifically on the provided content*. List *only* the relevant URLs, one per line, without any extra text or numbering. If none are relevant based on the content, respond with "NONE".
-
-User Query: ${query}
-
-History Items with Content:
-${validContents.map((item) => `URL: ${item.url}\nTitle: ${item.title}\nContent: ${item.text}\n---`).join("\n\n")}`;
-
-    const finalUrlsText = await callGemini(analysisPrompt);
-
-    if (!finalUrlsText || finalUrlsText.trim().toUpperCase() === "NONE") {
-        console.log("Background: Gemini final analysis (content) found no relevant URLs.");
-        return [];
-    }
-
-    // Parse the final list of URLs
-    const finalRelevantUrls = finalUrlsText
-        .split("\n")
-        .map((url) => url.trim())
-        .filter((url) => url.startsWith("http"));
-
-    if (finalRelevantUrls.length === 0) {
-        console.log("Background: No valid URLs extracted from Gemini's final analysis response.");
-        return [];
-    }
-    console.log("Background: Final relevant URLs identified by Gemini:", finalRelevantUrls);
-
-    // 5. Map Final URLs to History Items (for Title)
-    // Use a Set for efficient lookup and preserve order from Gemini's response
-    const finalUrlSet = new Set(finalRelevantUrls);
-    const finalResults = [];
-    // Iterate through the order Gemini provided
-    for (const url of finalRelevantUrls) {
-        // Find the original item (could be from allHistoryItems or validContents)
-        const originalItem = allHistoryItems.find((item) => item.url === url);
-        if (originalItem) {
-            finalResults.push({
-                url: originalItem.url,
-                title: originalItem.title || "No Title Available",
-            });
+        if (resultText && resultText !== "NONE" && (resultText.startsWith("http:") || resultText.startsWith("https:"))) {
+            const resultUrl = resultText;
+            console.log("Gemini suggested URL:", resultUrl);
+            const matchedItem = validItems.find((item) => item.url.toLowerCase() === resultUrl.toLowerCase());
+            if (matchedItem) {
+                return { url: matchedItem.url, title: matchedItem.title };
+            } else {
+                console.warn("Gemini returned a URL not found in the provided list:", resultUrl);
+                return null;
+            }
+        } else if (resultText === "NONE") {
+            console.log("Gemini indicated no relevant item found ('NONE').");
+            return null;
         } else {
-            console.warn(`Background: Could not find original history item for final URL: ${url}`);
+            console.warn("Gemini response format unexpected or empty:", resultText);
+            return null;
         }
+    } catch (error) {
+        console.error("Error calling or processing Gemini API:", error);
+        // Re-throw or handle as needed; here we let the caller handle it
+        throw new Error(`Failed to communicate with Gemini API: ${error.message}`);
     }
-
-    // Optional: Limit results based on maxResults setting from popup if needed
-    // const maxResultsSetting = request.maxResults || 50; // Get from original request if passed
-    // finalResults = finalResults.slice(0, maxResultsSetting);
-
-    console.log("Background: Final matched results:", finalResults);
-    return finalResults;
 }
 
-// --- Initialization ---
+// --- Event Listener ---
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log("Background: Received message raw:", message);
+
+    if (message && typeof message === "object" && message.action === "searchHistory") {
+        console.log("Background: Processing searchHistory action", message);
+
+        const query = message.query || "";
+        let timeRange = message.timeRange || "all_time"; // Default timeRange
+        // Ensure maxHistoryItems is a reasonable number, capping at our defined max
+        const requestedMaxItems = parseInt(message.maxHistoryItems, 10) || MAX_HISTORY_RESULTS;
+        const maxHistoryItems = Math.min(requestedMaxItems, MAX_HISTORY_RESULTS);
+
+        if (!query) {
+            console.error("Error: Empty query received.");
+            sendResponse({ success: false, error: "Search query cannot be empty." });
+            return false; // Synchronous response
+        }
+
+        // Validate timeRange before calling getStartTime
+        if (!["all_time", "last_day", "last_week", "last_month"].includes(timeRange)) {
+            console.warn(`Invalid timeRange "${timeRange}", defaulting to all_time.`);
+            timeRange = "all_time";
+        }
+        console.log(`Searching history with query: "${query}", timeRange: ${timeRange}, maxItems: ${maxHistoryItems}`);
+
+        const startTime = getStartTime(timeRange);
+
+        // 1. Fetch History
+        chrome.history.search(
+            {
+                text: "", // Fetch all history within the time range
+                maxResults: maxHistoryItems,
+                startTime: startTime,
+            },
+            async (historyItems) => {
+                if (chrome.runtime.lastError) {
+                    console.error("Error fetching history:", chrome.runtime.lastError);
+                    sendResponse({ success: false, error: `Failed to fetch history: ${chrome.runtime.lastError.message}` });
+                    return;
+                }
+
+                if (!historyItems || historyItems.length === 0) {
+                    console.log("No history items found for the specified criteria.");
+                    sendResponse({ success: true, results: [] });
+                    return;
+                }
+
+                console.log(`Fetched ${historyItems.length} initial history items.`);
+                const itemsToProcess = historyItems; // Using all fetched items for now
+
+                // 2. Fetch Content (Limited Concurrency)
+                console.log(`Starting content fetching for up to ${MAX_ITEMS_TO_FETCH_CONTENT} items...`);
+                const historyItemsWithContent = [];
+                const itemsToFetch = itemsToProcess.slice(0, MAX_ITEMS_TO_FETCH_CONTENT);
+                let fetchedCount = 0;
+
+                const promises = itemsToFetch.map((item) =>
+                    fetchContentFromApi(item.url).then((content) => {
+                        // Use the renamed fetch function
+                        fetchedCount++;
+                        // Log progress less aggressively
+                        if (fetchedCount % 10 === 0 || fetchedCount === itemsToFetch.length) {
+                            console.log(`Content fetch progress: ${fetchedCount}/${itemsToFetch.length}`);
+                        }
+                        return {
+                            url: item.url,
+                            title: item.title || "No Title",
+                            content: content, // Will be null if fetch failed/skipped
+                        };
+                    })
+                );
+
+                const results = await Promise.allSettled(promises);
+                results.forEach((result) => {
+                    if (result.status === "fulfilled") {
+                        historyItemsWithContent.push(result.value);
+                    } // Silently ignore rejected fetch promises (errors logged in fetchContentFromApi)
+                });
+
+                const successfulFetches = historyItemsWithContent.filter((i) => i.content).length;
+                console.log(`Finished fetching content. ${successfulFetches} items have content.`);
+
+                // 3. Call Gemini API
+                if (successfulFetches > 0) {
+                    console.log("Asking Gemini to find the most relevant item...");
+                    try {
+                        const relevantItem = await findRelevantHistoryWithGemini(query, historyItemsWithContent);
+
+                        if (relevantItem) {
+                            console.log("Gemini found a relevant item:", relevantItem);
+                            sendResponse({ success: true, results: [relevantItem] });
+                        } else {
+                            console.log("Gemini did not find a sufficiently relevant item or failed to parse response.");
+                            sendResponse({ success: true, results: [] });
+                        }
+                    } catch (error) {
+                        console.error("Error during Gemini processing:", error);
+                        sendResponse({ success: false, error: `Failed to process with AI: ${error.message}` });
+                    }
+                } else {
+                    console.log("No content successfully fetched, skipping Gemini call.");
+                    sendResponse({ success: true, results: [] }); // No results as no content could be analyzed
+                }
+            }
+        );
+
+        return true; // Indicates asynchronous response
+    } else if (message && typeof message === "object") {
+        console.warn("Background: Received message with unknown action:", message.action);
+        return false;
+    } else {
+        console.error("Background: Received invalid message format:", message);
+        return false;
+    }
+});
+
+// Remove the example history search block if it's still present
+// chrome.history.search({ text: "", startTime: 0, maxResults: 10 }, ...); // DELETE THIS BLOCK
+
 console.log("Background script loaded and listener attached.");
