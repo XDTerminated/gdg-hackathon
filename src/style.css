@@ -1,11 +1,9 @@
-/* Base styles */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-/* Page background */
 .page-background {
     background: linear-gradient(to bottom right, #111827, #000000);
     font-family: system-ui, -apple-system, sans-serif;
@@ -16,7 +14,6 @@
     justify-content: center;
 }
 
-/* Main container */
 .main-container {
     width: 400px;
     height: 600px;
@@ -30,7 +27,6 @@
     border: 1px solid rgba(75, 85, 99, 0.5);
 }
 
-/* Header */
 .header {
     padding: 16px;
     border-bottom: 1px solid rgba(75, 85, 99, 0.5);
@@ -51,7 +47,6 @@
     color: transparent;
 }
 
-/* Icon button */
 .icon-button {
     padding: 8px;
     border-radius: 12px;
@@ -74,7 +69,6 @@
     color: #60a5fa;
 }
 
-/* Results area */
 .results-area {
     flex: 1;
     overflow-y: auto;
@@ -87,7 +81,6 @@
     gap: 12px;
 }
 
-/* Link item */
 .link-item {
     display: block;
     padding: 16px;
@@ -129,7 +122,6 @@
     color: #9ca3af;
 }
 
-/* Search form */
 .search-container {
     padding: 16px;
     border-top: 1px solid rgba(75, 85, 99, 0.5);
@@ -173,7 +165,6 @@
     color: #6b7280;
 }
 
-/* Settings modal */
 .settings-modal {
     position: absolute;
     inset: 0;
@@ -241,7 +232,6 @@
     cursor: pointer;
 }
 
-/* Animation */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -277,31 +267,31 @@
 
 .link-preview-tooltip {
     position: fixed;
-    background-color: rgba(10, 10, 20, 0.95); /* Darker, slightly transparent */
+    background-color: rgba(10, 10, 20, 0.95);
     color: #e5e7eb;
     padding: 8px 12px;
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(75, 85, 99, 0.6);
     font-size: 0.8rem;
-    max-width: 350px; /* Limit width */
-    z-index: 1000; /* Ensure it's on top */
-    opacity: 0; /* Start hidden */
+    max-width: 350px;
+    z-index: 1000;
+    opacity: 0;
     transition: opacity 0.15s ease-in-out;
-    pointer-events: none; /* Prevent tooltip from blocking mouse events on elements below */
-    white-space: normal; /* Allow wrapping */
+    pointer-events: none;
+    white-space: normal;
 }
 
 .link-preview-tooltip .tooltip-title {
     display: block;
     font-weight: 600;
     margin-bottom: 4px;
-    color: #93c5fd; /* Light blue for title */
-    word-break: break-all; /* Break long titles */
+    color: #93c5fd;
+    word-break: break-all;
 }
 
 .link-preview-tooltip .tooltip-url {
     display: block;
-    color: #9ca3af; /* Gray for URL */
-    word-break: break-all; /* Break long URLs */
+    color: #9ca3af;
+    word-break: break-all;
 }

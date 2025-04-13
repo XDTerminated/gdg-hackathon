@@ -1,11 +1,7 @@
-// IMPORTANT: Replace with your actual Gemini API Key.
-// Storing API keys directly in code is insecure for published extensions.
-// Consider using chrome.storage.sync or a backend server for better security.
-const GEMINI_API_KEY = "AIzaSyDG1EvYmYgTjtEnS1hhpTqNTSCHgzGdoBw"; // Replace with your key
+const GEMINI_API_KEY = "AIzaSyDG1EvYmYgTjtEnS1hhpTqNTSCHgzGdoBw";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-// --- Storage Key Prefix ---
-const CONTENT_STORAGE_PREFIX = "page_content_";
+const CONTENT_FETCH_API_BASE = "https://hackez-gdg.hf.space/fetch_text";
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "searchHistory") {
@@ -19,30 +15,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 console.error("Background: Error during search:", error);
                 sendResponse({ success: false, error: error.message });
             });
-        return true; // Indicates that the response is sent asynchronously
-    } else if (request.action === "storePageContent") {
-        // --- Handle message from content script ---
-        if (request.url && request.content) {
-            const storageKey = CONTENT_STORAGE_PREFIX + request.url;
-            // Store content using URL as key. Overwrites previous content for the same URL.
-            // Consider adding timestamps or more complex storage logic if needed.
-            chrome.storage.local.set({ [storageKey]: request.content }, () => {
-                if (chrome.runtime.lastError) {
-                    console.error("Background: Error storing content for", request.url, chrome.runtime.lastError);
-                } else {
-                    console.log("Background: Stored content for:", request.url);
-                    // Optional: Implement logic to prune old storage entries if needed
-                }
-            });
-            // No need to sendResponse back to content script unless confirmation is required
-        }
-        return false; // No async response needed for this message
+        return true;
     }
 });
 
 async function performHistorySearch(userQuery) {
-    // 1. Fetch recent history
-    const maxHistoryItemsToFetch = 100; // Reduced limit to manage prompt size
+    const maxHistoryItemsToFetch = 1000;
     const oneWeekAgo = new Date().getTime() - 7 * 24 * 60 * 60 * 1000;
 
     const historyItems = await chrome.history.search({
@@ -57,49 +35,90 @@ async function performHistorySearch(userQuery) {
         return [];
     }
 
-    // --- 2. Fetch stored content for history items ---
-    const storageKeys = historyItems.map((item) => CONTENT_STORAGE_PREFIX + item.url);
-    const storedContentData = await chrome.storage.local.get(storageKeys);
+    console.log(`Background: Fetching content for ${historyItems.length} items via external API...`);
+    const fetchPromises = historyItems.map(async (item) => {
+        if (!item.url || (!item.url.startsWith("http://") && !item.url.startsWith("https://"))) {
+            return { url: item.url, content: "Skipped (invalid URL for fetch)." };
+        }
+        const encodedUrl = encodeURIComponent(item.url);
+        const apiUrl = `${CONTENT_FETCH_API_BASE}?url=${encodedUrl}`;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    // --- 3. Format history with content for Gemini ---
+            const response = await fetch(apiUrl, {
+                method: "GET",
+                headers: { accept: "text/plain" },
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                console.warn(`Background: API fetch failed for ${item.url}. Status: ${response.status}`);
+                return { url: item.url, content: `Content fetch failed (Status: ${response.status}).` };
+            }
+            const textContent = await response.text();
+            const MAX_FETCHED_CONTENT_LENGTH = 100000;
+            return { url: item.url, content: textContent.substring(0, MAX_FETCHED_CONTENT_LENGTH) };
+        } catch (error) {
+            if (error.name === "AbortError") {
+                console.warn(`Background: API fetch timed out for ${item.url}`);
+                return { url: item.url, content: "Content fetch timed out." };
+            }
+            console.error(`Background: Error fetching content via API for ${item.url}:`, error);
+            return { url: item.url, content: "Content fetch error." };
+        }
+    });
+
+    const fetchedContents = await Promise.all(fetchPromises);
+    const contentMap = new Map(fetchedContents.map((fc) => [fc.url, fc.content]));
+    console.log("Background: Finished fetching content via API.");
+
     let historyContext = "";
     let totalContentLength = 0;
-    const MAX_CONTEXT_LENGTH = 15000; // Limit total context size for Gemini
+    const MAX_CONTEXT_LENGTH = 15000;
 
     for (const item of historyItems) {
-        const storageKey = CONTENT_STORAGE_PREFIX + item.url;
-        const content = storedContentData[storageKey] || "No content captured."; // Get stored content or default text
-        const itemText = `- Title: ${item.title || "No Title"}\n  URL: ${item.url}\n  Content Snippet: ${content.substring(0, 200)}...\n\n`; // Include a snippet
+        const content = contentMap.get(item.url) || "Content not fetched.";
+        const contentSnippet = content.substring(0, 250);
+        const itemText = `- Title: ${item.title || "No Title"}\n  URL: ${item.url}\n  Content Snippet: ${contentSnippet}...\n\n`;
 
         if (totalContentLength + itemText.length <= MAX_CONTEXT_LENGTH) {
             historyContext += itemText;
             totalContentLength += itemText.length;
         } else {
             console.log("Background: Reached max context length, stopping history inclusion.");
-            break; // Stop adding items if context gets too long
+            break;
         }
     }
 
-    // --- 4. Construct the prompt for Gemini (Updated) ---
     const prompt = `
-Context: Here is a list of recently visited web pages from the user's browser history, including snippets of their text content:
+User Query: "${userQuery}"
+
+History Context (List of visited pages with Title, URL, and Content Snippet):
 --- History Start ---
 ${historyContext}
 --- History End ---
 
-User Query: "${userQuery}"
+Task:
+1. Analyze the User Query and the History Context.
+2. Identify **exactly 3** URLs from the History Context that are the most likely inferred matches for the User Query. Relevance can be based on title, URL, snippet, or related concepts. Guessing is required.
+3. Order the 3 URLs by confidence (most likely match first, least likely third).
+4. Respond with **ONLY** these 3 URLs, each on a new line.
 
-Task: Based ONLY on the provided browser history context (titles, URLs, and content snippets) and the user query, find the single most relevant URL that matches the user's query.
-Prioritize matches within the page content if available.
-Respond with ONLY the URL itself (e.g., https://example.com/page).
-If no relevant URL is found in the provided history context that directly answers the query, respond with the exact text "NOT_FOUND".
-Do not add any explanation or introductory text.
+**CRITICAL:** Your entire response MUST be only the 3 URLs. Do NOT include *any* other text, introductions, explanations, apologies, formatting (like numbers or bullets), or sentences.
+
+Example REQUIRED Output:
+https://example.com/best-guess
+https://another-example.com/second-guess
+https://example.org/third-guess
+
+Provide the 3 ordered URL guesses now.
     `;
 
-    console.log("Background: Sending prompt to Gemini.");
-    // console.log("Prompt:", prompt); // Uncomment for debugging
+    console.log("Background: Sending simplified/direct prompt for 3 ordered URLs.");
 
-    // --- 5. Call Gemini API (No changes needed here) ---
     try {
         const response = await fetch(GEMINI_API_URL, {
             method: "POST",
@@ -109,50 +128,90 @@ Do not add any explanation or introductory text.
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: {
-                    // Optional: Configure generation parameters
-                    // temperature: 0.7,
-                    // maxOutputTokens: 100,
+                    temperature: 0.8,
+                    maxOutputTokens: 500,
                 },
-                // Optional: Add safety settings if needed
-                // safetySettings: [ ... ],
             }),
         });
 
         if (!response.ok) {
             const errorBody = await response.text();
             console.error("Background: Gemini API Error Response:", errorBody);
+
+            try {
+                const errorJson = JSON.parse(errorBody);
+                console.error("Background: Gemini API Error Details:", errorJson);
+
+                if (errorJson.candidates?.[0]?.finishReason === "SAFETY") {
+                    console.warn("Background: Gemini response blocked due to safety settings.");
+
+                    return [];
+                }
+            } catch (parseError) {
+            }
             throw new Error(`Gemini API request failed: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
         console.log("Background: Received response from Gemini:", data);
 
-        const geminiResult = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-        if (!geminiResult || geminiResult === "NOT_FOUND") {
-            console.log("Background: Gemini did not find a relevant URL.");
+        if (!data.candidates || data.candidates.length === 0 || data.candidates[0].finishReason === "SAFETY") {
+            console.warn("Background: Gemini response missing candidates or blocked by safety filter. Finish Reason:", data.candidates?.[0]?.finishReason);
             return [];
         }
 
-        if (geminiResult.startsWith("http://") || geminiResult.startsWith("https://")) {
-            const foundHistoryItem = historyItems.find((item) => item.url === geminiResult);
-            const title = foundHistoryItem?.title || "Title not found in recent history";
-            console.log("Background: Gemini found URL:", geminiResult);
-            return [{ title: title, url: geminiResult }];
+        const geminiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+        if (!geminiResponseText) {
+            console.warn("Background: Gemini response text was empty after successful API call.");
+            return [];
+        }
+
+        const potentialUrls = geminiResponseText
+            .split("\n")
+            .map((url) => url.trim())
+            .filter((url) => url);
+        const results = [];
+        const maxResultsToReturn = 3;
+
+        console.log("Background: Potential URLs from Gemini:", potentialUrls);
+
+        for (const url of potentialUrls) {
+            if (results.length >= maxResultsToReturn) {
+                break;
+            }
+
+            if (url.startsWith("http://") || url.startsWith("https://")) {
+                const foundHistoryItem = historyItems.find((item) => item.url === url);
+                if (foundHistoryItem) {
+                    const title = foundHistoryItem.title || "Title not found in recent history";
+
+                    if (!results.some((r) => r.url === url)) {
+                        results.push({ title: title, url: url });
+                        console.log("Background: Added verified match:", url);
+                    }
+                } else {
+                    console.warn("Background: Gemini returned a URL not present in the provided history context:", url);
+                }
+            } else {
+                console.warn("Background: Gemini returned a non-URL string, ignoring:", url);
+            }
+        }
+
+        const finalResults = results.slice(0, maxResultsToReturn);
+
+        if (finalResults.length === 0) {
+            console.warn("Background: No valid URLs found in Gemini response after verification.");
+        } else if (finalResults.length < maxResultsToReturn) {
+            console.warn(`Background: Found only ${finalResults.length} valid URLs, expected ${maxResultsToReturn}.`);
         } else {
-            console.warn("Background: Gemini response doesn't look like a URL:", geminiResult);
-            return [];
+            console.log(`Background: Returning ${finalResults.length} verified potential matches.`);
         }
+
+        return finalResults;
     } catch (error) {
         console.error("Background: Error calling Gemini API:", error);
-        throw error;
+
+        return [];
     }
 }
-
-// Optional: Add logic to clean up old storage entries periodically
-// chrome.alarms.create('cleanupStorage', { periodInMinutes: 1440 }); // Once a day
-// chrome.alarms.onAlarm.addListener(alarm => {
-//   if (alarm.name === 'cleanupStorage') {
-//     // Implement cleanup logic here (e.g., remove entries older than X days)
-//   }
-// });
