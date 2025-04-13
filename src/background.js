@@ -1,6 +1,6 @@
 // --- Constants ---
 // IMPORTANT: Use your actual Gemini API Key. Consider securing this.
-const GEMINI_API_KEY = "AIzaSyDG1EvYmYgTjtEnS1hhpTqNTSCHgzGdoBw"; // Use the key from the file
+const GEMINI_API_KEY = ""; // Use the key from the file
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 // Assuming 'terminxted-gdg' is the correct Hugging Face Space name
 const FETCH_TEXT_API_URL = "https://terminxted-gdg.hf.space/fetch_text";
