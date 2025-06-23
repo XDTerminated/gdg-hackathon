@@ -6,83 +6,25 @@
         <link rel="stylesheet" href="/src/style.css" />
     </head>
     <body class="page-background">
-        <div class="main-container">
-            <div class="header">
-                <div class="header-content">
-                    <h1 class="app-title">Site Sleuth</h1>
-                    <button id="settingsButton" class="icon-button">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-                            <path d="M20 7h-9"></path>
-                            <path d="M14 17H5"></path>
-                            <circle cx="17" cy="17" r="3"></circle>
-                            <circle cx="7" cy="7" r="3"></circle>
-                        </svg>
-                    </button>
+        <!-- Header Section -->
+        <header class="header">
+            <h1>Site Sleuth</h1>
+        </header>
+
+        <!-- Main Container -->
+        <main class="main-container">
+            <!-- Chat Window -->
+            <div class="chat-window">
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Chat messages will be displayed here -->
                 </div>
             </div>
-
-            <div id="results" class="results-area">
-                <div class="links-list" id="linksList">
-                    <!-- Links will be inserted here by JavaScript -->
-                </div>
+            <!-- Chat Input Section -->
+            <div class="chatbox">
+                <input type="text" id="messageInput" placeholder="Ask something... (Press enter to send)" autocomplete="off" />
             </div>
+        </main>
 
-            <div class="search-container">
-                <form id="searchForm" class="search-form">
-                    <input type="text" id="searchInput" placeholder="Search history..." class="search-input" />
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="m21 21-4.3-4.3"></path>
-                    </svg>
-                </form>
-            </div>
-
-            <div id="settingsModal" class="settings-modal hidden">
-                <div class="modal-header">
-                    <h2 class="settings-title">Settings</h2>
-                    <button id="closeSettings" class="close-button">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-                            <path d="M18 6 6 18"></path>
-                            <path d="m6 6 12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="settings-content">
-                    <div class="setting-item">
-                        <label class="setting-label"> Max History Items (<span id="maxHistoryItemsValue" class="setting-value">1000</span>) </label>
-                        <input type="range" id="maxHistoryItemsSlider" min="10" max="5000" step="10" value="1000" class="setting-slider" />
-                    </div>
-
-                    <!-- Add Time Range Setting -->
-                    <div class="setting-item">
-                        <label for="timeRangeSelect" class="setting-label">Search Time Range</label>
-                        <select id="timeRangeSelect" class="setting-select">
-                            <option value="all_time" selected>All Time</option>
-                            <option value="last_day">Last 24 Hours</option>
-                            <option value="last_week">Last 7 Days</option>
-                            <option value="last_month">Last 30 Days</option>
-                        </select>
-                    </div>
-                    <!-- End Add Time Range Setting -->
-
-                    <div class="setting-item">
-                        <label class="setting-label"> Maximum Results (<span id="maxResultsValue" class="setting-value">50</span>) </label>
-                        <input type="range" id="maxResults" min="10" max="100" value="50" class="setting-slider" />
-                    </div>
-
-                    <div class="setting-item">
-                        <label class="setting-label"> Search Delay (<span id="searchDelayValue" class="setting-value">500</span>ms) </label>
-                        <input type="range" id="searchDelay" min="0" max="1000" step="100" value="500" class="setting-slider" />
-                    </div>
-
-                    <div class="setting-item">
-                        <label class="setting-label"> Cache Time (<span id="cacheTimeValue" class="setting-value">60</span> minutes) </label>
-                        <input type="range" id="cacheTime" min="5" max="120" step="5" value="60" class="setting-slider" />
-                    </div>
-                </div>
-            </div>
-        </div>
-        <script type="module" src="/src/main.js"></script>
+        <script src="/src/main.js"></script>
     </body>
 </html>
